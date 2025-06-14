@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import { AnimeNavBarDemo } from "@/components/ui/anime-navbar-demo"
 import { FileUpload } from "@/components/ui/file-upload"
 // Updated import to reflect removed category property
-import type { ReverseInterviewQuestion } from "@/lib/gemini"
+import { ReverseInterviewQuestion } from "@/lib/gemini"
 
 export default function ReverseInterviewPage() {
   const [jobDescFiles, setJobDescFiles] = useState<File[]>([])
