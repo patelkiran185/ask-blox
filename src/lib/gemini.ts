@@ -57,10 +57,11 @@ ${jobDescription}
 
 Please generate flashcards that:
 1. Focus on skills, experiences, and achievements mentioned in the resume
-2. Are relevant to the job requirements
+2. Are relevant to the job requirements, don't ask about a skill or project (which is in the resume) that incorporated a certain skill which ISN'T in the job description
 3. Include behavioral, technical, and situational questions
-4. Vary in difficulty (easy, medium, hard)
+4. Vary in difficulty (easy, medium, hard), the question may be short/mid-length/long 
 5. Include relevant tags for categorization
+6. In behavioral, don't ask technical, should be more like testing soft skills (Focus on any extracurriculars or achivements from resume)
 
 Return the response as a JSON array with this exact structure:
 [
@@ -125,7 +126,7 @@ export async function evaluateAnswer(
   question: string,
   expectedAnswer: string,
   userAnswer: string
-): Promise<{ isCorrect: boolean; feedback: string; score: number }> {
+): Promise<{ isCorrect: boolean; feedback: string; score: number; goodPoints: string; improvements: string }> {
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
   const prompt = `
@@ -135,12 +136,16 @@ QUESTION: ${question}
 EXPECTED ANSWER: ${expectedAnswer}
 USER'S ANSWER: ${userAnswer}
 
-Provide evaluation in this JSON format:
+Provide evaluation in this JSON format, with each bullet point on a new line:
 {
   "isCorrect": true/false,
-  "feedback": "Detailed feedback on the answer quality, what was good, what could be improved",
-  "score": 0-100 (numerical score)
+  "feedback": "Brief overall feedback",
+  "score": 0-100 (numerical score),
+  "goodPoints": "• First good point\\n• Second good point\\n• Third good point",
+  "improvements": "• First improvement area\\n• Second improvement area\\n• Third improvement area"
 }
+
+IMPORTANT: Each bullet point MUST be on its own line. Use \\n between bullet points.
 
 Consider:
 - Accuracy of information
@@ -148,6 +153,20 @@ Consider:
 - Relevance to the question
 - Communication clarity
 - Professional presentation
+
+For goodPoints and improvements:
+- Start each point with "• " (bullet and space)
+- Put each point on a new line using \\n
+- List at least 2-3 specific points for each
+- Be specific and actionable
+- For goodPoints: highlight specific strengths and effective elements
+- For improvements: suggest concrete ways to enhance the answer
+
+Example format for goodPoints:
+"goodPoints": "• First strength point here\\n• Second strength point here\\n• Third strength point here"
+
+Example format for improvements:
+"improvements": "• First improvement suggestion here\\n• Second improvement suggestion here\\n• Third improvement suggestion here"
 `
 
   try {
@@ -171,12 +190,21 @@ Consider:
     try {
       const evaluation = JSON.parse(cleanedText)
       
+      // Process bullet points to ensure proper line breaks
+      const processPoints = (points: string) => {
+        if (!points) return '• No points provided';
+        // Replace escaped newlines with actual newlines
+        return points.replace(/\\n/g, '\n');
+      };
+      
       // Ensure required fields with defaults
       return {
         isCorrect: typeof evaluation.isCorrect === 'boolean' ? evaluation.isCorrect : false,
         feedback: evaluation.feedback || 'Unable to provide feedback at this time.',
         score: typeof evaluation.score === 'number' && evaluation.score >= 0 && evaluation.score <= 100 
-          ? evaluation.score : 50
+          ? evaluation.score : 50,
+        goodPoints: processPoints(evaluation.goodPoints) || '• No specific strengths identified',
+        improvements: processPoints(evaluation.improvements) || '• No specific improvements identified'
       }
     } catch (parseError) {
       console.error('JSON parsing failed for evaluation:', parseError)
@@ -210,10 +238,13 @@ export async function generateInterviewQuestions(
   jobDescriptionText: string,
   candidateLevel?: string
 ): Promise<InterviewQuestion[]> {
-  // Debug: Log the input content to ensure it's being parsed correctly
-  console.log('Resume text length:', resumeText?.length || 0);
-  console.log('Job description length:', jobDescriptionText?.length || 0);
-  console.log('Resume preview:', resumeText?.substring(0, 200) + '...');
+  // Debug: Log the complete input content
+  console.log('=== COMPLETE RESUME TEXT ===');
+  console.log(resumeText);
+  console.log('\n=== COMPLETE JOB DESCRIPTION TEXT ===');
+  console.log(jobDescriptionText);
+  console.log('\n=== CANDIDATE LEVEL ===');
+  console.log(candidateLevel);
   
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
