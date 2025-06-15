@@ -80,7 +80,7 @@ define(['./workbox-c008c882'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "/_next/app-build-manifest.json",
-    "revision": "e94aa09d51b42d2e9d929139d805e77f"
+    "revision": "65f7dd76a586a2474bf413ba7fe65b6d"
   }, {
     "url": "/_next/build-manifest.json",
     "revision": "9cb6afb2be56767e85f623122637a919"
@@ -88,14 +88,14 @@ define(['./workbox-c008c882'], (function (workbox) { 'use strict';
     "url": "/_next/react-loadable-manifest.json",
     "revision": "3ac0ba1724dd05999e4eea6afc29cf1f"
   }, {
-    "url": "/_next/server/app/learn/page_client-reference-manifest.js",
-    "revision": "f4f878a20af9df239d843325dbc58166"
+    "url": "/_next/server/app/_not-found/page_client-reference-manifest.js",
+    "revision": "93ce38d88fa719f6b70645048510fd0c"
   }, {
-    "url": "/_next/server/app/mindmap/page_client-reference-manifest.js",
-    "revision": "ad18a2582db3204b24ff404a114a24d8"
+    "url": "/_next/server/app/dashboard/page_client-reference-manifest.js",
+    "revision": "66e5210dd9d399341dc8e59d58a8bdbd"
   }, {
-    "url": "/_next/server/app/page_client-reference-manifest.js",
-    "revision": "48d0918c9138904bba4048231f2d9bad"
+    "url": "/_next/server/app/reverse-interview/page_client-reference-manifest.js",
+    "revision": "a23a0f0487b6de09133e1964f803eff1"
   }, {
     "url": "/_next/server/middleware-build-manifest.js",
     "revision": "bbc5b5443a06ed383d19c7d003e8bd5f"
@@ -110,43 +110,34 @@ define(['./workbox-c008c882'], (function (workbox) { 'use strict';
     "revision": "d51420cd4aa5d37d6719849cf36d0d6f"
   }, {
     "url": "/_next/static/chunks/_app-pages-browser_node_modules_clerk_nextjs_dist_esm_app-router_client_keyless-creator-reader_js.js",
-    "revision": "afeee516184a3692acee5008e80a6c7d"
+    "revision": "34d77237be829c88ceac9b50ab53ace3"
   }, {
     "url": "/_next/static/chunks/_app-pages-browser_node_modules_clerk_nextjs_dist_esm_app-router_keyless-actions_js.js",
-    "revision": "3bc54e21f97002f7cae61bf4c6dadf17"
+    "revision": "77f8d6abbf69c96cbfb64e389a604df1"
   }, {
     "url": "/_next/static/chunks/app-pages-internals.js",
-    "revision": "d26c17802f4a993a8066c284acf0314a"
+    "revision": "31db7eadef488b8c4b2cb2c616900540"
+  }, {
+    "url": "/_next/static/chunks/app/_not-found/page.js",
+    "revision": "6bd2a7dc3bad43413e14d23318e23a45"
   }, {
     "url": "/_next/static/chunks/app/layout.js",
-    "revision": "3e88835de0b6e63653d45327d25e5251"
+    "revision": "aea7e7e599d504fccf4bc9c6b1715348"
   }, {
     "url": "/_next/static/chunks/polyfills.js",
     "revision": "846118c33b2c0e922d7b3a7676f81f6f"
   }, {
     "url": "/_next/static/chunks/webpack.js",
-    "revision": "d3911d717720d0e7400cb261419ae064"
+    "revision": "46407250b3d0f2ed970b74a7702855a9"
   }, {
     "url": "/_next/static/css/app/layout.css",
-    "revision": "2ed0df4f39511125f2147e8bc6761fdb"
-  }, {
-    "url": "/_next/static/css/app/mindmap/page.css",
-    "revision": "292a142a8c4bb0e0e1270dc6de901ddd"
+    "revision": "338767bdf6d4929087b23fd0efc1bdf2"
   }, {
     "url": "/_next/static/development/_buildManifest.js",
     "revision": "4d0d8cbc8169bdf91cc559eaf46d2784"
   }, {
     "url": "/_next/static/development/_ssgManifest.js",
     "revision": "abee47769bf307639ace4945f9cfd4ff"
-  }, {
-    "url": "/_next/static/webpack/288ddef4d40aa90c.webpack.hot-update.json",
-    "revision": "development"
-  }, {
-    "url": "/_next/static/webpack/app/layout.288ddef4d40aa90c.hot-update.js",
-    "revision": "development"
-  }, {
-    "url": "/_next/static/webpack/webpack.288ddef4d40aa90c.hot-update.js",
-    "revision": "development"
   }], {
     "ignoreURLParametersMatching": [/ts/]
   });
