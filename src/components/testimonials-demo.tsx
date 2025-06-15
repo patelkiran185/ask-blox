@@ -6,6 +6,8 @@ import { useState, useRef, useEffect } from "react"
 import { InterviewQuestion } from "@/lib/gemini"
 import { Card, CardContent } from "@/components/ui/card"
 import { Star, RotateCcw, Volume2, Mic, MicOff, X } from "lucide-react"
+import { DomainSelector } from './domain-selector'
+import { CandidateLevelCombobox } from '@/components/ui/candidate-level-combobox'
 
 interface Testimonial {
   id: string;
@@ -36,10 +38,12 @@ const SWIPE_OUT_DURATION = 250
 
 export function TestimonialsSection({ 
   questions, 
+  selectedDomain = 'tech',
   title = "Your Personalized Interview Questions", 
   description = "AI-generated questions based on your resume and the job description. Practice these to ace your interview!"
 }: { 
   questions?: InterviewQuestion[]; 
+  selectedDomain?: string;
   title?: string; 
   description?: string; 
 }) {
@@ -63,6 +67,7 @@ export function TestimonialsSection({
     goodPoints: string;
     improvements: string;
   } | null>(null)
+  const [userAnswer, setUserAnswer] = useState('')
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false)
   const [isProcessingFeedback, setIsProcessingFeedback] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -257,7 +262,12 @@ export function TestimonialsSection({
     }
     setShowFeedbackPopup(false)
     setFeedback(null)
+    setUserAnswer('')
     setTranscript('')
+    
+    // Clear notes and advance to next question when popup closes
+    setNotes('')
+    setCurrentIndex((prev) => Math.min(prev + 1, displayData.length - 1))
   }
 
   // Global recording for textarea
@@ -319,16 +329,16 @@ export function TestimonialsSection({
   }
 
   const handleAnswerSubmit = async () => {
-    if (!notes.trim()) return
+    if (!notes.trim()) return;
     
     if (isFlashcards && displayData[currentIndex]) {
       // Get AI feedback for flashcards
-      setIsProcessingFeedback(true)
+      setIsProcessingFeedback(true);
       
       try {
-        const currentQuestion = displayData[currentIndex] as InterviewQuestion
+        const currentQuestion = displayData[currentIndex] as InterviewQuestion;
+        console.log('Submitting answer for question:', currentQuestion);
         
-        // Call the API route instead of the function directly
         const response = await fetch('/api/evaluate-answer', {
           method: 'POST',
           headers: {
@@ -337,31 +347,32 @@ export function TestimonialsSection({
           body: JSON.stringify({
             question: currentQuestion.question,
             expectedAnswer: currentQuestion.tips,
-            userAnswer: notes
+            userAnswer: notes,
+            domain: selectedDomain
           }),
-        })
+        });
 
         if (!response.ok) {
-          throw new Error('Failed to evaluate answer')
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to get feedback');
         }
 
-        const result = await response.json()
-        
-        setFeedback(result)
-        setTranscript(notes) // Set the notes as transcript for display
-        setShowFeedbackPopup(true)
-      } catch (error) {
-        console.error('Error getting feedback:', error)
-        alert('Failed to get feedback. Please try again.')
+        const data = await response.json();
+        setFeedback(data);
+        setUserAnswer(notes); // Store the user's answer
+        setShowFeedbackPopup(true); // Show the popup after getting feedback
+      } catch (error: any) {
+        console.error('Error getting feedback:', error.message);
+        setFeedback(null);
+        // Still clear notes and advance on error
+        setNotes('');
+        setCurrentIndex((prev) => Math.min(prev + 1, displayData.length - 1));
       } finally {
-        setIsProcessingFeedback(false)
+        setIsProcessingFeedback(false);
       }
-    } else {
-      // Save notes for testimonials
-      console.log('Notes submitted:', notes)
-      localStorage.setItem('practice-notes', notes)
-      alert('Notes saved successfully!')
     }
+    
+    // Don't clear notes or advance here - let the popup handle it
   }
 
   // Event listeners for mouse
@@ -426,21 +437,13 @@ export function TestimonialsSection({
   }
 
   return (
-    <section className="bg-black px-4 sm:px-6 lg:px-8 py-8 overflow-hidden">
-      <div className="text-center mb-8">
-        <h3 className="text-white text-2xl sm:text-3xl font-semibold mb-4">{title}</h3>
-        <p className="text-gray-400 max-w-2xl mx-auto text-base sm:text-lg">
-          {description}
-        </p>
-        {isFlashcards && (
-          <p className="text-blue-400 text-sm mt-2">
-            ← Swipe left to save for later • Swipe right to continue →
-          </p>
-        )}
-      </div>
+    <section className="py-8 bg-slate-950">
+      <div className="container px-4 mx-auto">
+        <div className="max-w-2xl mx-auto mb-12 text-center">
+          <h2 className="mt-8 text-3xl md:text-4xl font-bold text-white">{title}</h2>
+          <p className="mt-4 text-lg text-slate-400">{description}</p>
+        </div>
 
-      {/* Responsive container for cards and textarea */}
-      <div className="max-w-7xl mx-auto overflow-hidden">
         {showResetBar ? (
           <div className="flex justify-center items-center min-h-[600px]">
             <div className="flex flex-col items-center space-y-4">
@@ -659,7 +662,7 @@ export function TestimonialsSection({
               <div>
                 <h4 className="text-lg font-semibold text-white mb-2">Your Answer:</h4>
                 <div className="bg-gray-800 rounded-lg p-4">
-                  <p className="text-gray-300 leading-relaxed">{transcript}</p>
+                  <p className="text-gray-300 leading-relaxed">{userAnswer}</p>
                 </div>
               </div>
 

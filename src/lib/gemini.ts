@@ -1,12 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import PDFParser from 'pdf2json'
+import { DOMAINS, type DomainSkill } from './domains'
 
 const apiKey = process.env.GEMINI_API_KEY
 if (!apiKey) {
-  console.warn('GEMINI_API_KEY not found in environment variables')
+  console.warn('Warning: GEMINI_API_KEY is not set in environment variables')
 }
 
-const genAI = new GoogleGenerativeAI(apiKey || '')
+const genAI = new GoogleGenerativeAI(apiKey || 'dummy-key-for-development')
 
 // Function to convert PDF to text
 async function pdfToText(pdfBuffer: Buffer): Promise<string> {
@@ -176,12 +177,77 @@ Make sure the questions are personalized to this candidate's background and the 
   }
 }
 
+interface EvaluationResult {
+  isCorrect: boolean;
+  feedback: string;
+  score: number;
+  goodPoints: string;
+  improvements: string;
+  matchedSkill: string;
+  skillProficiency: boolean;
+}
+
+async function matchQuestionToSkill(
+  question: string,
+  domain: string,
+  model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+): Promise<{ skill: DomainSkill; proficiency: boolean }> {
+  const domainData = DOMAINS[domain as keyof typeof DOMAINS];
+  const domainSkills = domainData?.skills;
+  
+  if (!domainSkills) {
+    throw new Error(`Invalid domain: ${domain}`);
+  }
+
+  const prompt = `Given this interview question: "${question}"
+And these skills for the ${domain} domain: ${domainSkills.join(', ')}
+
+1. Which ONE skill from the list best matches the question's focus? Consider the semantic meaning, not just keywords.
+2. Based on the question's complexity and scope, would a correct answer demonstrate proficiency in this skill? Answer only yes or no.
+
+Format your response exactly like this example:
+Skill: [(Skill name)(System Design)]
+Proficiency: [yes/no]`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  
+  const skillMatch = text.match(/Skill: (.*)/);
+  const proficiencyMatch = text.match(/Proficiency: (.*)/);
+  
+  if (!skillMatch || !proficiencyMatch) {
+    throw new Error('Failed to parse skill matching response');
+  }
+
+  const matchedSkill = skillMatch[1].trim();
+  const proficiency = proficiencyMatch[1].trim().toLowerCase() === 'yes';
+
+  const skillExists = domainSkills.some(skill => skill === matchedSkill);
+  if (!skillExists) {
+    console.warn(`Matched skill "${matchedSkill}" not found in domain skills, using first skill as fallback`);
+    return { skill: domainSkills[0] as DomainSkill, proficiency: false };
+  }
+
+  return { skill: matchedSkill as DomainSkill, proficiency };
+}
+
 export async function evaluateAnswer(
   question: string,
   expectedAnswer: string,
   userAnswer: string
 ): Promise<{ isCorrect: boolean; feedback: string; score: number; goodPoints: string; improvements: string }> {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+  if (!apiKey) {
+    console.log('Using mock data for evaluation');
+    return {
+      isCorrect: true,
+      feedback: "This is mock feedback since GEMINI_API_KEY is not set",
+      score: 85,
+      goodPoints: "• Mock good point 1\n• Mock good point 2",
+      improvements: "• Mock improvement 1\n• Mock improvement 2"
+    };
+  }
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   const prompt = `
 Please evaluate this interview answer:
@@ -221,28 +287,28 @@ Example format for goodPoints:
 
 Example format for improvements:
 "improvements": "• First improvement suggestion here\\n• Second improvement suggestion here\\n• Third improvement suggestion here"
-`
+`;
 
   try {
-    const result = await model.generateContent(prompt)
-    const response = await result.response
-    const text = response.text()
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
     
     // Clean up the response and parse JSON
-    let cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    let cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
     // Additional cleanup for common issues
-    cleanedText = cleanedText.replace(/^[^{\[]*/, '') // Remove any text before JSON starts
-    cleanedText = cleanedText.replace(/[^}\]]*$/, '') // Remove any text after JSON ends
+    cleanedText = cleanedText.replace(/^[^{\[]*/, ''); // Remove any text before JSON starts
+    cleanedText = cleanedText.replace(/[^}\]]*$/, ''); // Remove any text after JSON ends
     
     // Try to find JSON object in the response
-    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/)
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      cleanedText = jsonMatch[0]
+      cleanedText = jsonMatch[0];
     }
     
     try {
-      const evaluation = JSON.parse(cleanedText)
+      const evaluation = JSON.parse(cleanedText);
       
       // Process bullet points to ensure proper line breaks
       const processPoints = (points: string) => {
@@ -259,14 +325,14 @@ Example format for improvements:
           ? evaluation.score : 50,
         goodPoints: processPoints(evaluation.goodPoints) || '• No specific strengths identified',
         improvements: processPoints(evaluation.improvements) || '• No specific improvements identified'
-      }
+      };
     } catch (parseError) {
-      console.error('JSON parsing failed for evaluation:', parseError)
-      throw new Error('Failed to parse AI response')
+      console.error('JSON parsing failed for evaluation:', parseError);
+      throw new Error('Failed to parse AI response');
     }
   } catch (error) {
-    console.error('Error evaluating answer:', error)
-    throw new Error('Failed to evaluate answer')
+    console.error('Error evaluating answer:', error);
+    throw new Error('Failed to evaluate answer');
   }
 }
 
@@ -290,7 +356,8 @@ export interface ReverseInterviewQuestion {
 export async function generateInterviewQuestions(
   resumeText: string,
   jobDescriptionText: string,
-  candidateLevel?: string
+  candidateLevel?: string,
+  domain: string = 'tech' // default to tech if not specified
 ): Promise<InterviewQuestion[]> {
   // Debug: Log the complete input content
   console.log('=== COMPLETE RESUME TEXT ===');
@@ -299,6 +366,8 @@ export async function generateInterviewQuestions(
   console.log(jobDescriptionText);
   console.log('\n=== CANDIDATE LEVEL ===');
   console.log(candidateLevel);
+  console.log('\n=== DOMAIN ===');
+  console.log(domain);
   
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
@@ -320,9 +389,10 @@ export async function generateInterviewQuestions(
 
   const difficultyDistribution = getDifficultyDistribution(candidateLevel || 'entry-level');
   const levelDescription = candidateLevel ? `Candidate Level: ${candidateLevel.charAt(0).toUpperCase() + candidateLevel.slice(1).replace('-', ' ')}` : '';
+  const domainName = DOMAINS[domain as keyof typeof DOMAINS].name;
 
   const prompt = `
-  You are an expert interview coach. Create 6 SPECIFIC and PERSONALIZED interview questions for a ${candidateLevel || 'entry-level'} candidate based STRICTLY on their resume content.
+  You are an expert interview coach specializing in ${domainName} roles. Create 6 DIVERSE and PERSONALIZED interview questions for a ${candidateLevel || 'entry-level'} candidate based STRICTLY on their resume content.
 
   CANDIDATE'S RESUME:
   ${resumeText}
@@ -331,21 +401,21 @@ export async function generateInterviewQuestions(
   ${jobDescriptionText}
 
   ${levelDescription}
+  Domain: ${domainName}
 
   CRITICAL RULES - MUST FOLLOW:
   1. ONLY ask about technologies, skills, projects, and experiences that are EXPLICITLY mentioned in the RESUME
   2. DO NOT ask about anything from the job description that is not also in the resume
-  3. If the resume mentions "JavaScript" but not "React", DO NOT ask about React
-  4. If the resume mentions "Python" but not "Django", DO NOT ask about Django
-  5. Use the job description ONLY to understand the role context, NOT to generate question content
-  6. Every technical question must reference something specifically written in the resume
 
+  3. Use the job description ONLY to understand the role context, NOT to generate question content
 
-  QUESTION TYPES TO GENERATE:
-  - Technical questions about technologies/frameworks mentioned in the resume
-  - Project-based questions about specific projects listed in the resume  
-  - Experience questions about roles and responsibilities from the resume
-  - Behavioral questions related to achievements mentioned in the resume
+  MANDATORY QUESTION TYPE DISTRIBUTION (exactly 6 questions):
+  1. TECHNICAL QUESTION (1): About specific ${domainName} technologies/tools mentioned in resume
+  2. PROJECT-BASED QUESTION (1): About a specific ${domainName}-related project from resume
+  3. BEHAVIORAL QUESTION (1): About teamwork, leadership, or problem-solving context using resume examples
+  4. EXPERIENCE QUESTION (1): About professional experience/roles mentioned in resume related to ${domainName}
+  5. SITUATIONAL QUESTION (1): "How would you handle..." scenario based on ${domainName} challenges, using resume background
+  6. GROWTH/LEARNING QUESTION (1): About learning new skills, overcoming challenges, or career development
 
   DIFFICULTY LEVELS FOR ${candidateLevel || 'entry-level'}:
   - Basic: ${difficultyDistribution.Basic} questions (fundamental concepts)
@@ -353,36 +423,38 @@ export async function generateInterviewQuestions(
   - Medium: ${difficultyDistribution.Medium} questions (practical scenarios)
   - Hard: ${difficultyDistribution.Hard} questions (complex problem-solving)
 
-  EXAMPLES OF CORRECT APPROACH:
-  ✅ If resume says "Built a web app using React" → "Tell me about the React web app you built"
-  ❌ If resume says "JavaScript experience" but JD mentions "React" → DO NOT ask about React
+  EXAMPLES OF DIVERSE QUESTION TYPES:
+  - Technical: "Walk me through how you implemented [SPECIFIC TECH FROM RESUME] in your [SPECIFIC PROJECT FROM RESUME]"
+  - Behavioral: "Tell me about a time you had to collaborate with others on [SPECIFIC PROJECT/EXPERIENCE FROM RESUME]"
+  - Situational: "If you encountered [RELEVANT CHALLENGE] in a ${domainName} role, how would you approach it based on your experience with [RESUME EXPERIENCE]?"
+  - Experience: "What was your role and key contributions in [SPECIFIC ROLE/PROJECT FROM RESUME]?"
+  - Growth: "How did you learn [SPECIFIC SKILL FROM RESUME] and what challenges did you face?"
 
   Generate exactly 6 questions in this JSON format:
   [
     {
       "id": "q1",
-      "question": "Walk me through your experience with [REPLACE WITH ACTUAL TECHNOLOGY FROM RESUME] and how you used it in [REPLACE WITH ACTUAL PROJECT FROM RESUME]",
-      "category": "Technical",
+      "question": "Walk me through how you implemented [ACTUAL TECHNOLOGY FROM RESUME] in your [ACTUAL PROJECT FROM RESUME]",
+      "category": "${domainName}",
       "difficulty": "Medium", 
       "tips": "Focus on specific implementation details and challenges you overcame"
     }
   ]
 
-  EXAMPLE OF GOOD QUESTIONS (customize based on actual resume content):
-  - "Tell me about your experience building REST APIs with Node.js at [ACTUAL COMPANY NAME]"
-  - "How did you implement authentication in your [ACTUAL PROJECT NAME] project?"
-  - "Describe a challenging bug you encountered while working with [ACTUAL TECHNOLOGY] and how you solved it"
-
   DO NOT USE:
   - Placeholder text like [technology], [skill], [project], etc.
-  - Technologies mentioned in job description but NOT in resume
-  - Generic questions that could apply to anyone
-  - File names or document references
+  - Technologies or skills not mentioned in resume
+  - All questions of the same type (avoid 6 technical questions)
+  - Questions not relevant to ${domainName}
 
   VALIDATION CHECK:
-  Before finalizing each question, ask yourself: "Is everything I'm asking about explicitly mentioned in the candidate's resume?\" If NO, rewrite the question.
+  Before finalizing each question, ask yourself:
+  1. "Is everything I'm asking about explicitly mentioned in the candidate's resume?"
+  2. "Is this question relevant to the ${domainName} domain?"
+  3. "Do I have diverse question types (technical, behavioral, situational, etc.)?"
+  If NO to any, rewrite the question.
 
-  Return ONLY the JSON array with actual, specific content from the resume.
+  Return ONLY the JSON array with actual, specific content from the resume and diverse question types.
   `;
 
   try {
@@ -443,15 +515,15 @@ export async function generateInterviewQuestions(
           } else {
             console.warn('Detected placeholder text in question, using fallback');
           }
-          question = 'Tell me about a specific project you worked on and the technologies you used.';
+          question = `Tell me about a specific ${domainName.toLowerCase()}-related project you worked on.`;
         }
         
         return {
           id: q.id || `q${index + 1}`,
           question: question,
-          category: q.category || 'General',
+          category: domainName,
           difficulty: ['Basic', 'Easy', 'Medium', 'Hard'].includes(q.difficulty) ? q.difficulty : 'Medium',
-          tips: q.tips || 'Be specific and provide concrete examples.'
+          tips: q.tips || `Be specific and provide concrete examples from your ${domainName.toLowerCase()} experience.`
         };
       });
       
@@ -466,45 +538,45 @@ export async function generateInterviewQuestions(
     return [
       {
         id: "q1",
-        question: "Tell me about yourself and why you're interested in this role.",
-        category: "General",
+        question: `Tell me about your background in ${domainName}.`,
+        category: domainName,
         difficulty: "Easy",
-        tips: "Keep it concise, focus on relevant experience and show enthusiasm for the role."
+        tips: `Focus on your relevant ${domainName.toLowerCase()} experience and show enthusiasm for the role.`
       },
       {
         id: "q2", 
-        question: "Describe a challenging project you worked on and how you overcame obstacles.",
-        category: "Behavioral",
+        question: `Describe a challenging ${domainName.toLowerCase()}-related project you worked on.`,
+        category: domainName,
         difficulty: "Medium",
         tips: "Use the STAR method: Situation, Task, Action, Result."
       },
       {
         id: "q3",
-        question: "What are your greatest strengths and how do they apply to this position?",
-        category: "Experience", 
+        question: `What are your greatest strengths in ${domainName}?`,
+        category: domainName,
         difficulty: "Easy",
-        tips: "Choose strengths that directly relate to the job requirements."
+        tips: `Choose strengths that directly relate to ${domainName.toLowerCase()} roles.`
       },
       {
         id: "q4",
-        question: "Where do you see yourself in 5 years?",
-        category: "General",
-        difficulty: "Medium", 
-        tips: "Show ambition while aligning with the company's growth opportunities."
+        question: `Where do you see yourself in 5 years in the ${domainName.toLowerCase()} field?`,
+        category: domainName,
+        difficulty: "Medium",
+        tips: "Show ambition while aligning with industry trends."
       },
       {
         id: "q5",
-        question: "Why do you want to work for this company?",
-        category: "Experience",
+        question: `Why did you choose to pursue a career in ${domainName}?`,
+        category: domainName,
         difficulty: "Easy",
-        tips: "Research the company and mention specific values or projects that appeal to you."
+        tips: "Share your passion and motivation for the field."
       },
       {
         id: "q6",
-        question: "Do you have any questions for us?",
-        category: "General",
-        difficulty: "Easy",
-        tips: "Always have thoughtful questions prepared about the role, team, or company culture."
+        question: `What recent developments in ${domainName} interest you the most?`,
+        category: domainName,
+        difficulty: "Medium",
+        tips: "Show that you stay current with industry trends."
       }
     ];
   }

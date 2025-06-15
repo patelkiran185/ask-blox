@@ -5,6 +5,7 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { TestimonialsSection } from "@/components/testimonials-demo";
 import { InterviewQuestion } from "@/lib/gemini";
 import { CandidateLevelCombobox } from "@/components/ui/candidate-level-combobox";
+import { DomainSelector } from '@/components/domain-selector';
 
 export default function LearnPage() {
   const [resumeFiles, setResumeFiles] = useState<File[]>([]);
@@ -14,6 +15,7 @@ export default function LearnPage() {
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [candidateLevel, setCandidateLevel] = useState<string>('');
+  const [selectedDomain, setSelectedDomain] = useState<string>('tech');
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [jobDescError, setJobDescError] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -153,6 +155,7 @@ export default function LearnPage() {
       console.log('Complete Resume Text:', resumeText);
       console.log('Complete Job Description Text:', jobDescriptionText);
       console.log('Candidate Level:', candidateLevel);
+      console.log('Selected Domain:', selectedDomain);
 
       // Call API to generate questions
       const response = await fetch('/api/generate-questions', {
@@ -164,6 +167,7 @@ export default function LearnPage() {
           resumeText,
           jobDescriptionText,
           candidateLevel,
+          domain: selectedDomain,
         }),
       });
 
@@ -304,8 +308,22 @@ export default function LearnPage() {
           </div>
         </div>
 
-        {/* Candidate Level Selection */}
+        {/* Domain Selection */}
         {resumeFiles.length > 0 && isJobDescComplete && (
+          <div className="mt-6 sm:mt-8 max-w-md mx-auto px-4">
+            <h3 className="text-white text-lg font-semibold text-center mb-4">
+              Select Domain
+            </h3>
+            <DomainSelector 
+              value={selectedDomain}
+              onValueChange={setSelectedDomain}
+              placeholder="Choose domain..."
+            />
+          </div>
+        )}
+
+        {/* Candidate Level Selection */}
+        {resumeFiles.length > 0 && isJobDescComplete && selectedDomain && (
           <div className="mt-6 sm:mt-8 max-w-md mx-auto px-4">
             <h3 className="text-white text-lg font-semibold text-center mb-4">
               Select Your Experience Level
@@ -319,7 +337,7 @@ export default function LearnPage() {
         )}
 
         {/* Generate Questions Button */}
-        {resumeFiles.length > 0 && isJobDescComplete && candidateLevel && (
+        {resumeFiles.length > 0 && isJobDescComplete && selectedDomain && candidateLevel && (
           <div className="mt-6 sm:mt-8 flex flex-col items-center px-4 space-y-4">
             <button
               onClick={handleGenerateQuestions}
@@ -345,6 +363,7 @@ export default function LearnPage() {
           {questions.length > 0 ? (
             <TestimonialsSection 
               questions={questions}
+              selectedDomain={selectedDomain}
               title="Your Personalized Interview Questions"
               description="AI-generated questions based on your resume and the job description. Practice these to ace your interview!"
             />
