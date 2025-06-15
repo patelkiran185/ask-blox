@@ -1,11 +1,65 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import PDFParser from 'pdf2json'
 
 const apiKey = process.env.GEMINI_API_KEY
 if (!apiKey) {
   console.warn('GEMINI_API_KEY not found in environment variables')
 }
 
-const genAI = new GoogleGenerativeAI(apiKey || 'dummy-key-for-development')
+const genAI = new GoogleGenerativeAI(apiKey || '')
+
+// Function to convert PDF to text
+async function pdfToText(pdfBuffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser()
+    
+    pdfParser.on('pdfParser_dataReady', (pdfData) => {
+      const text = pdfParser.getRawTextContent()
+      resolve(text)
+    })
+
+    pdfParser.on('pdfParser_dataError', (error) => {
+      reject(error)
+    })
+
+    pdfParser.parseBuffer(pdfBuffer)
+  })
+}
+
+// Function to extract relevant sections from text
+function extractSections(text: string, type: 'resume' | 'jobDescription'): {
+  projects?: string;
+  experience?: string;
+  skills?: string;
+  role?: string;
+  domains?: string;
+  requirements?: string;
+} {
+  // Clean up the text
+  const cleanText = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+
+  if (type === 'resume') {
+    const projectsMatch = cleanText.match(/PROJECTS?[\s\S]*?(?=EDUCATION|SKILLS|EXPERIENCE|ACHIEVEMENTS|LANGUAGES|$)/i);
+    const experienceMatch = cleanText.match(/EXPERIENCE[\s\S]*?(?=PROJECTS|EDUCATION|SKILLS|ACHIEVEMENTS|LANGUAGES|$)/i);
+    const skillsMatch = cleanText.match(/SKILLS[\s\S]*?(?=PROJECTS|EDUCATION|EXPERIENCE|ACHIEVEMENTS|LANGUAGES|$)/i);
+    
+    return {
+      projects: projectsMatch ? projectsMatch[0].trim() : '',
+      experience: experienceMatch ? experienceMatch[0].trim() : '',
+      skills: skillsMatch ? skillsMatch[0].trim() : ''
+    };
+  } else {
+    const rolesMatch = cleanText.match(/Designation:?[\s\S]*?(?=Key Responsibilities|Foundational Skills|Advanced Skills|How to Apply|About Techolution|$)/i);
+    const domainsMatch = cleanText.match(/DOMAINS?:?[\s\S]*?(?=ROLES|REQUIREMENTS|$)/i);
+    const requirementsMatch = cleanText.match(/(Foundational Skills|Advanced Skills)[\s\S]*?(?=How to Apply|About Techolution|$)/i);
+    
+    return {
+      role: rolesMatch ? rolesMatch[0].trim() : '',
+      domains: domainsMatch ? domainsMatch[0].trim() : '',
+      requirements: requirementsMatch ? requirementsMatch[0].trim() : ''
+    };
+  }
+}
 
 export interface FlashcardData {
   question: string
@@ -630,5 +684,127 @@ export async function generateReverseInterviewQuestions(
   } catch (error) {
     console.error('Error generating reverse interview questions:', error);
     throw new Error('Failed to generate questions');
+  }
+}
+
+export interface SkillCluster {
+  label: string;
+  type: 'matched' | 'gap' | 'quickWin';
+  description: string;
+  percentage: number;
+  talkingPoint?: string;
+}
+
+export interface ProcessedData {
+  skillClusters: SkillCluster[];
+  connections: {
+    source: string;
+    target: string;
+    type: 'matched' | 'gap' | 'quickWin';
+  }[];
+}
+
+export async function processInterviewData(jobDescriptionData: any, resumeData: any): Promise<ProcessedData> {
+  if (!apiKey || apiKey === 'dummy-key-for-development') {
+    console.log('Using mock data for processInterviewData when API key is not available');
+    // Return mock data for testing when API key is not available
+    return {
+      skillClusters: [
+        { label: 'System Design', type: 'matched', description: 'Strong match from your backend projects', percentage: 90, talkingPoint: 'Highlight your experience with building scalable backend systems using [specific project/technology].' },
+        { label: 'AI/ML Projects', type: 'quickWin', description: 'Unique chatbot with real users - major differentiator', percentage: 85, talkingPoint: 'Emphasize the user impact and technical challenges of your chatbot project.' },
+        { label: 'Leadership', type: 'gap', description: 'No formal team lead experience', percentage: 30, talkingPoint: 'Focus on instances where you took initiative or mentored junior team members, even if not in a formal lead role.' },
+        { label: 'Cloud Architecture', type: 'matched', description: 'AWS experience from side projects', percentage: 70, talkingPoint: 'Discuss how your AWS knowledge from side projects can be directly applied to similar cloud environments.' },
+        { label: 'Microservices', type: 'gap', description: 'Limited production experience', percentage: 40, talkingPoint: 'Acknowledge the gap and express eagerness to learn, perhaps mentioning relevant courses or personal studies.' },
+        { label: 'Interview Strategy Map', type: 'matched', description: 'Your personalized battle plan', percentage: 100, talkingPoint: 'This is your overall strategy; use it to guide your responses.' },
+        { label: 'Steer to AI/ML', type: 'quickWin', description: 'When asked about general experience, pivot to your AI/ML chatbot project and its impact.', percentage: 95, talkingPoint: 'Use your AI/ML chatbot project as a strong example of your innovation and initiative.' },
+        { label: 'Highlight Problem-Solving', type: 'quickWin', description: 'For behavioral questions, use STAR method and focus on instances where you overcame technical challenges.', percentage: 80, talkingPoint: 'Prepare specific examples of problem-solving using the STAR method.' }
+      ],
+      connections: [
+        { source: 'Interview Strategy Map', target: 'System Design', type: 'matched' },
+        { source: 'Interview Strategy Map', target: 'AI/ML Projects', type: 'quickWin' },
+        { source: 'Interview Strategy Map', target: 'Leadership', type: 'gap' },
+        { source: 'Interview Strategy Map', target: 'Cloud Architecture', type: 'matched' },
+        { source: 'Interview Strategy Map', target: 'Microservices', type: 'gap' },
+        { source: 'Interview Strategy Map', target: 'Steer to AI/ML', type: 'quickWin' },
+        { source: 'Interview Strategy Map', target: 'Highlight Problem-Solving', type: 'quickWin' }
+      ],
+    };
+  }
+
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  const prompt = `
+  Given the following extracted sections from a resume and a job description, generate an 'Interview Strategy Map'.
+  The map should identify key skills/areas, categorize them as 'matched', 'gap', or 'quickWin', and provide a relevance percentage.
+  Also, suggest connections between the 'Interview Strategy Map' central node and these skill clusters.
+  Crucially, also include specific actionable "interview steering strategies" as 'quickWin' nodes.
+  For each skill cluster, provide a 'talkingPoint' that is a concise suggestion for how the candidate should discuss this skill during an interview to maximize impact or address a gap.
+
+  Resume Data:
+  Projects: ${resumeData.projects || 'N/A'}
+  Experience: ${resumeData.experience || 'N/A'}
+  Skills: ${resumeData.skills || 'N/A'}
+
+  Job Description Data:
+  Role: ${jobDescriptionData.role || 'N/A'}
+  Domains: ${jobDescriptionData.domains || 'N/A'}
+  Requirements: ${jobDescriptionData.requirements || 'N/A'}
+
+  Provide the output as a JSON object with two arrays: 'skillClusters' and 'connections'.
+  'skillClusters' should have objects with 'label' (skill/area name), 'type' ('matched', 'gap', 'quickWin'), 'description', 'percentage' (0-100), and a 'talkingPoint' that provides actionable advice. The 'talkingPoint' MUST always be present and concise.
+  The 'Interview Strategy Map' should be a central node with type 'matched' and percentage 100.
+  'connections' should have objects with 'source', 'target', and 'type' matching the skill cluster type.
+
+  Example JSON Structure:
+  {
+    "skillClusters": [
+      {"label": "Interview Strategy Map", "type": "matched", "description": "Your personalized battle plan", "percentage": 100, "talkingPoint": "This is your overall strategy; use it to guide your responses."},
+      {"label": "System Design", "type": "matched", "description": "Strong match from your backend projects", "percentage": 90, "talkingPoint": "Highlight your experience with building scalable backend systems using specific project names and technologies mentioned in your resume."},
+      {"label": "AI/ML Projects", "type": "quickWin", "description": "Unique chatbot with real users - major differentiator", "percentage": 85, "talkingPoint": "Emphasize the user impact and technical challenges you overcame in your AI/ML chatbot project. Quantify results if possible."},
+      {"label": "Leadership", "type": "gap", "description": "No formal team lead experience", "percentage": 30, "talkingPoint": "For leadership questions, focus on instances where you took initiative, mentored junior colleagues, or led small project modules, even if not in a formal role. Frame these as 'informal leadership'."},
+      {"label": "Cloud Architecture", "type": "matched", "description": "AWS experience from side projects", "percentage": 70, "talkingPoint": "Connect your AWS side project experience directly to the job's cloud requirements, focusing on transferable skills and eagerness to learn more."},
+      {"label": "Microservices", "type": "gap", "description": "Limited production experience", "percentage": 40, "talkingPoint": "Acknowledge the limited production experience but pivot to your understanding of microservices principles and any relevant academic projects or personal studies."},
+      {"label": "Steer to AI/ML", "type": "quickWin", "description": "When asked about general experience, pivot to your AI/ML chatbot project and its impact.", "percentage": 95, "talkingPoint": "Proactively bring up your AI/ML chatbot project as a key differentiator, even if the question is broad. Explain its unique aspects and your role."},
+      {"label": "Highlight Problem-Solving", "type": "quickWin", "description": "For behavioral questions, use STAR method and focus on instances where you overcame technical challenges.", "percentage": 80, "talkingPoint": "Prepare 2-3 specific examples of technical challenges you faced, detailing the Situation, Task, Action, and Result (STAR method)."},
+      {"label": "Address Communication Skills", "type": "quickWin", "description": "If the job emphasizes communication, provide examples of presenting technical topics to non-technical audiences.", "percentage": 75, "talkingPoint": "Have examples ready where you simplified complex technical concepts for diverse audiences (e.g., presentations, documentation, team discussions)."}
+    ],
+    "connections": [
+      {"source": "Interview Strategy Map", "target": "System Design", "type": "matched"},
+      {"source": "Interview Strategy Map", "target": "AI/ML Projects", "type": "quickWin"},
+      {"source": "Interview Strategy Map", "target": "Leadership", "type": "gap"},
+      {"source": "Interview Strategy Map", "target": "Cloud Architecture", "type": "matched"},
+      {"source": "Interview Strategy Map", "target": "Microservices", "type": "gap"},
+      {"source": "Interview Strategy Map", "target": "Steer to AI/ML", "type": "quickWin"},
+      {"source": "Interview Strategy Map", "target": "Highlight Problem-Solving", "type": "quickWin"},
+      {"source": "Interview Strategy Map", "target": "Address Communication Skills", "type": "quickWin"}
+    ]
+  }
+  Ensure the JSON is well-formed and complete.
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+    
+    let cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+    try {
+      const parsedData = JSON.parse(cleanedText) as ProcessedData;
+      // Basic validation
+      if (!parsedData.skillClusters || !Array.isArray(parsedData.skillClusters) ||
+          !parsedData.connections || !Array.isArray(parsedData.connections)) {
+        throw new Error('Invalid structure from Gemini API');
+      }
+      return parsedData;
+    } catch (parseError) {
+      console.error('Error parsing Gemini response JSON:', parseError);
+      console.error('Raw Gemini response text:', cleanedText);
+      throw new Error('Failed to parse Gemini API response.');
+    }
+
+  } catch (error) {
+    console.error('Error calling Gemini API for interview data:', error);
+    throw new Error('Failed to generate interview map data from Gemini.');
   }
 }

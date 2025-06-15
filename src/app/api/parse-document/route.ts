@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const fileType = formData.get('type') as string // 'resume' or 'jobDescription'
     
     if (!file) {
       return NextResponse.json(
@@ -34,7 +35,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if file is PDF
     if (file.type !== 'application/pdf') {
       return NextResponse.json(
         { error: 'File must be a PDF' },
@@ -42,40 +42,71 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Convert File to Buffer
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-
-    // Parse PDF using pdf2json
     const pdfParser = new PDFParser()
     
-    const pdfData = await new Promise<PDFData>((resolve, reject) => {
-      pdfParser.on('pdfParser_dataReady', (data: PDFData) => {
-        resolve(data)
-      })
+    const text = await new Promise<string>((resolve, reject) => {
+      pdfParser.on('pdfParser_dataReady', (pdfData: PDFData) => {
+        let extractedText = '';
+        pdfData.Pages.forEach((page) => {
+          if (page.Texts && page.Texts.length > 0) {
+            page.Texts.forEach((text) => {
+              if (text.R && text.R.length > 0) {
+                text.R.forEach((r) => {
+                  if (r.T) {
+                    extractedText += decodeURIComponent(r.T) + ' ';
+                  }
+                });
+              }
+            });
+          }
+        });
+        resolve(extractedText.trim());
+      });
       
-      pdfParser.on('pdfParser_dataError', (errMsg: { parserError: Error }) => {
-        reject(errMsg.parserError)
-      })
+      pdfParser.on('pdfParser_dataError', (error) => {
+        reject(error);
+      });
       
-      pdfParser.parseBuffer(buffer)
-    })
+      pdfParser.parseBuffer(buffer);
+    });
     
-    // Extract text from all pages
-    const text = pdfData.Pages.map((page) => 
-      page.Texts.map((text) => 
-        decodeURIComponent(text.R[0].T)
-      ).join(' ')
-    ).join('\n')
-    
-    if (!text) {
+    if (!text || text.length === 0) {
       return NextResponse.json(
         { error: 'Could not extract text from PDF' },
         { status: 400 }
       )
     }
 
-    return NextResponse.json({ text })
+    // Process the extracted text based on file type
+    let processedData;
+    if (fileType === 'resume') {
+      // Extract projects and experience sections
+      const projectsMatch = text.match(/PROJECTS?[\s\S]*?(?=EDUCATION|SKILLS|$)/i);
+      const experienceMatch = text.match(/EXPERIENCE[\s\S]*?(?=PROJECTS|EDUCATION|SKILLS|$)/i);
+      
+      processedData = {
+        projects: projectsMatch ? projectsMatch[0].trim() : '',
+        experience: experienceMatch ? experienceMatch[0].trim() : ''
+      };
+    } else if (fileType === 'jobDescription') {
+      // Extract domains, roles, and requirements
+      const domainsMatch = text.match(/DOMAINS?[\s\S]*?(?=ROLES|REQUIREMENTS|$)/i);
+      const rolesMatch = text.match(/ROLES?[\s\S]*?(?=DOMAINS|REQUIREMENTS|$)/i);
+      const requirementsMatch = text.match(/REQUIREMENTS?[\s\S]*?(?=DOMAINS|ROLES|$)/i);
+      
+      processedData = {
+        domains: domainsMatch ? domainsMatch[0].trim() : '',
+        roles: rolesMatch ? rolesMatch[0].trim() : '',
+        requirements: requirementsMatch ? requirementsMatch[0].trim() : ''
+      };
+    }
+
+    return NextResponse.json({ 
+      text,
+      processedData 
+    })
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Failed to parse PDF' },
