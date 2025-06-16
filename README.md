@@ -1,67 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+#  AskBlox
 
-## Getting Started
+**AskBlox** is your smartest interview prep ally — a personalized, AI-powered platform that helps candidates prepare not just for questions, but for the *interview conversation itself*.
 
-### 1. Environment Setup
+Whether you're preparing for placements, internships, or a job switch, AskBlox gives you real-time voice-based mock interviews, strategic skill mapping, and contextual questions to flip the script during interviews.
 
-✅ **Environment variables are already configured!**
 
-The `.env.local` file contains all necessary Clerk credentials and MongoDB connection strings.
 
-### 2. Install Dependencies
+## 🎥 Demo
+
+👉 [
+
+https://github.com/user-attachments/assets/8051a9f9-4a15-41fa-9875-ea0e2ef1ffd0
+
+]
+
+
+
+## ✨ Features
+
+### 🎙️ Mock Interview  
+Experience realistic, voice-driven interviews to practice speaking.  
+- AI-generated questions based on your resume and job description  
+- Voice interaction   
+- Helps build confidence, articulation, and clarity
+
+### 🔁 Reverse-Interview Trainer 
+Teaches you what to ask *them*.  
+- Analyzes your resume and the job description  
+- Generates smart, contextual questions for you to ask the interviewer  
+- Helps you stand out in the last critical minutes of the interview  
+
+### 🗺️ Interview Map  
+Visualize your interview strategy.  
+- Creates a personalized mind map showing:  
+  - 🔵 Skill clusters (what the JD is testing)  
+  - 🟢 Quick wins (your strengths)  
+  - 🔴 Gaps or missing areas  
+- Designed for visual learners to plan their interview approach
+- Gives you a talking point/strategy for interview
+
+### 🧩 SkillSphere  
+Track your interview readiness and where to improve.  
+- Interactive, visual skill map across categories:  
+  - 💻 Technical  
+  - 💬 Behavioral  
+  - 🛠️ Projects  
+  - 🧠 Problem-Solving  
+  - 📜 Experience / Background  
+- Offers upskilling suggestions to close gaps
+
+---
+
+## ✅ Why AskBlox is Better (Compared to Traditional Platforms)
+
+- **🕒 Practice Anytime** – No waiting for mentor slots or scheduling; AI is available 24/7 for on-demand interview prep.  
+- **📊 Consistent Feedback** – Get standardized, unbiased feedback based on proven metrics — no variability between mentors.  
+- **💸 Cost-Effective** – Unlimited mock interviews with a single payment; no pay-per-session pricing like ₹500–₹2000.  
+- **📈 Progress Tracking** – Track your improvement over time: speaking clarity, confidence, topic mastery, and more.  
+- **🚀 Self-Paced & Scalable** – Designed to work for individuals, classrooms, and institutions — grow at your own pace with zero bottlenecks.
+
+---
+
+## 🧑‍💻 Tech Stack
+
+- **Next.js** — Fullstack framework for frontend & backend  
+- **MongoDB** — NoSQL database for storing user data and insights  
+- **Clerk** — User authentication and session management  
+- **Gemini API** — Powers AI-based content generation and analysis  
+- **React Flow** — Dynamic visualization for the Interview Map & SkillSphere  
+- **Framer Motion** — Smooth animations for UI  
+- **PWA (Progressive Web App)** — Installable and mobile-friendly for on-the-go usage  
+
+---
+
+## 📦 Installation & Setup
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/your-username/askblox.git
+cd askblox
+
+# 2. Install dependencies
 npm install
-# or
-yarn install
-```
 
-### 3. Run the Development Server
+# 3. Set up environment variables
+# Create a .env.local file and add your Clerk, MongoDB, Gemini/OpenAI keys
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+GEMINI_API_KEY=
+SERPER_API_KEY=
+GOOGLE_API_KEY=
+GOOGLE_CSE_ID=
 
-```bash
+# 4. Run the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Features
-
-- **Authentication**: Integrated with [Clerk](https://clerk.com) for user authentication
-- **Video Background**: Landing page with video background support
-- **PWA Support**: Progressive Web App capabilities
-- **Responsive Design**: Mobile-first responsive design with Tailwind CSS
-
-## Project Structure
-
-- `/src/app/` - Main application pages
-- `/src/app/landing/` - Landing page with video background
-- `/src/app/sign-in/` - Clerk sign-in page
-- `/src/app/sign-up/` - Clerk sign-up page
-- `/public/images/` - Static images and videos
-- `/middleware.ts` - Clerk authentication middleware
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Clerk Documentation](https://clerk.com/docs) - learn about Clerk authentication.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
